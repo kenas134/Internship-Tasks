@@ -3,8 +3,9 @@ package main
 import (
 	"net/http"
 
-	"github.com/gin-gonic/gin"
 	"errors"
+
+	"github.com/gin-gonic/gin"
 )
 
 type book struct {
@@ -24,25 +25,25 @@ func getBooks(c *gin.Context) {
 	c.IndentedJSON(http.StatusOK, books)
 }
 
-func getBookById(id string)(*book,error){
-	for i,b := range books {
+func getBookById(id string) (*book, error) {
+	for i, b := range books {
 		if b.ID == id {
-			return &books[i],nil
+			return &books[i], nil
 		}
 	}
-	return nil,errors.New("Book Not Found")
+	return nil, errors.New("Book Not Found")
 }
 
 func bookById(c *gin.Context) {
 	id := c.Param("id")
-	book,err := getBookById(id)
+	book, err := getBookById(id)
 
 	if err != nil {
-		c.IndentedJSON(http.StatusNotFound,gin.H{"messege": "Book not found"})
+		c.IndentedJSON(http.StatusNotFound, gin.H{"messege": "Book not found"})
 		return
 	}
 
-	c.IndentedJSON(http.StatusOK,book)
+	c.IndentedJSON(http.StatusOK, book)
 
 }
 
@@ -50,22 +51,22 @@ func checkoutBook(c *gin.Context) {
 	id, ok := c.GetQuery("id")
 
 	if !ok {
-		c.IndentedJSON(http.StatusBadRequest,gin.H{"Message":"Missing query"})
+		c.IndentedJSON(http.StatusBadRequest, gin.H{"Message": "Missing query"})
 	}
 
-	book,err := getBookById(id)
+	book, err := getBookById(id)
 	if err != nil {
-		c.IndentedJSON(http.StatusNotFound,gin.H{"messege": "Book not found"})
+		c.IndentedJSON(http.StatusNotFound, gin.H{"messege": "Book not found"})
 		return
 	}
 
 	if book.Quantity <= 0 {
-		c.IndentedJSON(http.StatusNotFound,gin.H{"messege": "Book not available"})
+		c.IndentedJSON(http.StatusNotFound, gin.H{"messege": "Book not available"})
 		return
 	}
 
 	book.Quantity -= 1
-	c.IndentedJSON(http.StatusOK,book)
+	c.IndentedJSON(http.StatusOK, book)
 
 }
 
@@ -80,11 +81,16 @@ func createBook(c *gin.Context) {
 	c.IndentedJSON(http.StatusCreated, newBook)
 }
 
+func ping(c *gin.Context) {
+	c.JSON(200, gin.H{"message": "pong"})
+}
+
 func main() {
 	router := gin.Default()
 	router.GET("/books", getBooks)
-	router.GET("/books/:id",bookById)
+	router.GET("/books/:id", bookById)
 	router.POST("/books", createBook)
-	router.PATCH("/checkout/",createBook)
+	router.PATCH("/checkout/", createBook)
+	router.GET("/ping", ping)
 	router.Run("localhost:8080")
 }
