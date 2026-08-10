@@ -1,115 +1,186 @@
 package data
 
 import (
-	"task_manager/models"
-	"time"
+	"context"
 	"errors"
+
+	"task_manager/models"
+
+	"go.mongodb.org/mongo-driver/v2/bson"
+	"go.mongodb.org/mongo-driver/v2/mongo"
 )
 
-var tasks = []models.Task{
+var collection *mongo.Collection
 
-	{
-		ID:          "1",
-		Title:       "Clean the room",
-		Description: "Organize books, clothes, and clean the floor",
-		DueDate:     time.Date(2026, time.August, 10, 8, 0, 0, 0, time.UTC),
-		Status:      "Pending",
-	},
-
-	{
-		ID:          "2",
-		Title:       "Wash dishes",
-		Description: "Clean all dishes after breakfast and dinner",
-		DueDate:     time.Date(2026, time.August, 10, 19, 0, 0, 0, time.UTC),
-		Status:      "Completed",
-	},
-
-	{
-		ID:          "3",
-		Title:       "Buy groceries",
-		Description: "Buy vegetables, fruits, milk, and other household items",
-		DueDate:     time.Date(2026, time.August, 12, 15, 30, 0, 0, time.UTC),
-		Status:      "Pending",
-	},
-
-	{
-		ID:          "4",
-		Title:       "Do laundry",
-		Description: "Wash and fold dirty clothes",
-		DueDate:     time.Date(2026, time.August, 14, 9, 0, 0, 0, time.UTC),
-		Status:      "In Progress",
-	},
-
-	{
-		ID:          "5",
-		Title:       "Water plants",
-		Description: "Water all plants in the house and garden",
-		DueDate:     time.Date(2026, time.August, 16, 7, 30, 0, 0, time.UTC),
-		Status:      "Pending",
-	},
+func InitCollection(col *mongo.Collection) {
+	collection = col
 }
 
+// Get all tasks
+func GetTasks() ([]models.Task, error) {
+	var tasks []models.Task
 
-func GetTasks()[]models.Task{
-	return tasks
+	ctx := context.TODO()
+
+	cursor, err := collection.Find(ctx, bson.M{})
+	if err != nil {
+		return nil, err
+	}
+	defer cursor.Close(ctx)
+
+	if err := cursor.All(ctx, &tasks); err != nil {
+		return nil, err
+	}
+
+	return tasks, nil
 }
 
+// Get one task
 func GetTaskByID(id string) (models.Task, error) {
+	var task models.Task
 
-    for _, task := range tasks {
-        if task.ID == id {
-            return task, nil
-        }
-    }
+	objectID, err := bson.ObjectIDFromHex(id)
+	if err != nil {
+		return models.Task{}, err
+	}
 
-    return models.Task{}, errors.New("task not found")
+	err = collection.FindOne(
+		context.TODO(),
+		bson.M{"_id": objectID},
+	).Decode(&task)
+
+	if err != nil {
+		return models.Task{}, err
+	}
+
+	return task, nil
 }
 
-func CreateTask(task models.Task) {
-    tasks = append(tasks, task)
+// Create task
+func CreateTask(task models.Task) (models.Task, error) {
+	result, err := collection.InsertOne(
+		context.TODO(),
+		task,
+	)
+
+	if err != nil {
+		return models.Task{}, err
+	}
+
+	// MongoDB generated the ObjectID.
+	task.ID = result.InsertedID.(bson.ObjectID)
+
+	return task, nil
 }
 
-func DeleteTaskByID(id string) error {
-
-    for i, task := range tasks {
-
-        if task.ID == id {
-
-            tasks = append(tasks[:i], tasks[i+1:]...)
-
-            return nil
-        }
-    }
-
-    return errors.New("task not found")
-}
-
+// Update task
 func UpdateTaskByID(id string, updatedTask models.Task) error {
+	objectID, err := bson.ObjectIDFromHex(id)
+	if err != nil {
+		return err
+	}
 
-    for i, task := range tasks {
+	filter := bson.M{
+		"_id": objectID,
+	}
 
-        if task.ID == id {
+	update := bson.M{
+		"$set": bson.M{
+			"title":       updatedTask.Title,
+			"description": updatedTask.Description,
+			"dueDate":     updatedTask.DueDate,
+			"status":      updatedTask.Status,
+		},
+	}
 
-            if updatedTask.Title != "" {
-                tasks[i].Title = updatedTask.Title
-            }
+	result, err := collection.UpdateOne(
+		context.TODO(),
+		filter,
+		update,
+	)
 
-            if updatedTask.Description != "" {
-                tasks[i].Description = updatedTask.Description
-            }
+	if err != nil {
+		return err
+	}
 
-            if updatedTask.Status != "" {
-                tasks[i].Status = updatedTask.Status
-            }
+	if result.MatchedCount == 0 {
+		return errors.New("task not found")
+	}
 
-            if !updatedTask.DueDate.IsZero() {
-                tasks[i].DueDate = updatedTask.DueDate
-            }
-
-            return nil
-        }
-    }
-
-    return errors.New("task not found")
+	return nil
 }
 
+// Delete task
+func DeleteTaskByID(id string) error {
+	objectID, err := bson.ObjectIDFromHex(id)
+	if err != nil {
+		return err
+	}
+
+	filter := bson.M{
+		"_id": objectID,
+	}
+
+	result, err := collection.DeleteOne(
+		context.TODO(),
+		filter,
+	)
+
+	if err != nil {
+		return err
+	}
+
+	if result.DeletedCount == 0 {
+		return errors.New("task not found")
+	}
+
+	return nil
+}
+
+// Seed database with initial tasks
+func SeedTasks() error {
+	ctx := context.TODO()
+
+	// Check whether the collection already contains tasks.
+	count, err := collection.CountDocuments(ctx, bson.M{})
+	if err != nil {
+		return err
+	}
+
+	// Don't insert seed data if tasks already exist.
+	if count > 0 {
+		return nil
+	}
+
+	tasks := []models.Task{
+		{
+			Title:       "Learn Go",
+			Description: "Learn Go fundamentals",
+			Status:      "pending",
+		},
+		{
+			Title:       "Learn MongoDB",
+			Description: "Learn MongoDB CRUD operations",
+			Status:      "pending",
+		},
+		{
+			Title:       "Build REST API",
+			Description: "Build Task Management REST API",
+			Status:      "in-progress",
+		},
+		{
+			Title:       "Test API",
+			Description: "Test all endpoints using Postman",
+			Status:      "pending",
+		},
+		{
+			Title:       "Write Documentation",
+			Description: "Document the Task Management API",
+			Status:      "completed",
+		},
+	}
+
+	_, err = collection.InsertMany(ctx, tasks)
+
+	return err
+}
