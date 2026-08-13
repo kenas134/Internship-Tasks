@@ -39,7 +39,6 @@ func main() {
 	auth.Use(AuthMiddleware())
 
 	auth.GET("/profile", Profile)
-
 	auth.GET("/tasks", GetTasks)
 
 	// ----------------------------------------

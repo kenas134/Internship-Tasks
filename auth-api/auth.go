@@ -42,6 +42,12 @@ var refreshTokens = make(map[string]uint)
 // REGISTER
 // --------------------------------------------------
 
+
+//steps to register
+//1.accept req of RegisterRequest(email and password) using shouldbind
+//2.check if email already exists
+//3.hash pass word using bcrypt.GenerateFromPassword
+//
 func Register(c *gin.Context) {
 
 	var req RegisterRequest
@@ -100,6 +106,11 @@ func Register(c *gin.Context) {
 // --------------------------------------------------
 // LOGIN
 // --------------------------------------------------
+//steps to login
+//1.accept the loginRequest
+//2.check if user exists
+//3.compare the password
+
 
 func Login(c *gin.Context) {
 
@@ -178,6 +189,10 @@ func Login(c *gin.Context) {
 // --------------------------------------------------
 // CREATE ACCESS TOKEN
 // --------------------------------------------------
+//steps to create access token
+//1.create  claim
+
+
 
 func createAccessToken(user *User) (string, error) {
 
