@@ -19,18 +19,21 @@ func NewTaskUsecase(
 	}
 }
 
-func (u *TaskUsecase) CreateTask(task domain.Task) error {
+func (u *TaskUsecase) CreateTask(task domain.Task) (domain.Task,error) {
 
 	if task.Title == "" {
-		return errors.New("title is required")
+		return domain.Task{},errors.New("title is required")
 	}
 
 	if task.Status == "" {
 		task.Status = "pending"
 	}
 
-	return u.repository.Create(task)
+	newTask,err := u.repository.Create(&task)
+	return *newTask,err
 }
+
+
 
 func (u *TaskUsecase) GetTasks() ([]domain.Task, error) {
 

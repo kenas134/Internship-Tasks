@@ -11,7 +11,7 @@ import (
 )
 
 func ConnectMongoDB() *mongo.Client {
-	mongoURI := os.Getenv("MONGO_URI")
+	mongoURI := os.Getenv("MONGODB_URI")
 
 	if mongoURI == "" {
 		log.Fatal("MONGODB_URI is not set")

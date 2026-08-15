@@ -8,62 +8,58 @@ import (
 )
 
 type UserUsecase struct {
-	userRepository repositories.UserRepository
+	userRepository  repositories.UserRepository
 	passwordService infrastructure.PasswordService
-	jwtService infrastructure.JWTService
+	jwtService      infrastructure.JWTService
 }
 
-
 func NewUserUsecase(
-	userRepository     repositories.UserRepository,
-	passwordService    infrastructure.PasswordService,
+	userRepository repositories.UserRepository,
+	passwordService infrastructure.PasswordService,
 	jwtService infrastructure.JWTService,
 
 ) *UserUsecase {
 	return &UserUsecase{
-		userRepository: userRepository,
+		userRepository:  userRepository,
 		passwordService: passwordService,
-		jwtService: jwtService,
+		jwtService:      jwtService,
 	}
 }
 
-
-
-
-
-func (u *UserUsecase) Register(user domain.User) error {
+func (u *UserUsecase) Register(user domain.User) (domain.User, error) {
 
 	if user.Username == "" {
-		return errors.New("username is required")
+		return domain.User{}, errors.New("username is required")
 	}
 
 	if len(user.Password) < 8 {
-		return errors.New("password must be at least 8 characters")
+		return domain.User{}, errors.New("password must be at least 8 characters")
 	}
 
 	// Check if username already exists
 	_, err := u.userRepository.GetUserByUsername(user.Username)
 
 	if err == nil {
-		return errors.New("username already exists")
+		return domain.User{}, errors.New("username already exists")
 	}
 
 	// Hash password
-	hashedPassword, err := u.passwordService.Hash(
-		user.Password,
-	)
-
+	hashedPassword, err := u.passwordService.Hash(user.Password)
 	if err != nil {
-		return err
+		return domain.User{}, err
 	}
 
 	user.Password = hashedPassword
 
-	return u.userRepository.CreateUser(user)
+	newUser, err := u.userRepository.CreateUser(&user)
+	if err != nil {
+		return domain.User{}, err
+	}
+
+	return newUser, nil
 }
 
-
-func (u *UserUsecase) Login(username string, password string)(string, string, error) {
+func (u *UserUsecase) Login(username string, password string) (string, string, error) {
 	user, err := u.userRepository.GetUserByUsername(username)
 
 	if err != nil {
@@ -89,7 +85,7 @@ func (u *UserUsecase) Login(username string, password string)(string, string, er
 	)
 
 	if err != nil {
-		return "","",err
+		return "", "", err
 	}
 
 	refreshToken, err := u.jwtService.GenerateRefreshToken(
@@ -103,11 +99,10 @@ func (u *UserUsecase) Login(username string, password string)(string, string, er
 	return accessToken, refreshToken, nil
 }
 
+func (u *UserUsecase) Profile(id string) (domain.User, error) {
+	return u.userRepository.GetUserByID(id)
+}
 
-
-
-
-
-
-
-
+func (u *UserUsecase) ListUsers() ([]domain.User, error) {
+	return u.userRepository.GetUsers()
+}

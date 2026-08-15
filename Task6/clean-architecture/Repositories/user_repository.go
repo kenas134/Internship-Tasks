@@ -2,6 +2,7 @@ package repositories
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	domain "clean-architecture/Domain"
@@ -11,7 +12,7 @@ import (
 )
 
 type UserRepository interface {
-	CreateUser(user domain.User) error
+	CreateUser(user *domain.User) (domain.User, error)
 	GetUsers() ([]domain.User, error)
 	GetUserByUsername(username string) (domain.User, error)
 	GetUserByID(id string) (domain.User, error)
@@ -36,11 +37,9 @@ func NewUserRepository(db *mongo.Database) *UserRepositoryImpl {
 	}
 }
 
-
-
 func (service *UserRepositoryImpl) CreateUser(
-	user domain.User,
-) error {
+	user *domain.User,
+) (domain.User, error) {
 
 	ctx, cancel := context.WithTimeout(
 		context.Background(),
@@ -56,12 +55,29 @@ func (service *UserRepositoryImpl) CreateUser(
 		Role:      user.Role,
 	}
 
-	_, err := service.collection.InsertOne(
+	result, err := service.collection.InsertOne(
 		ctx,
 		newUser,
 	)
 
-	return err
+	if err != nil {
+		return domain.User{}, err
+	}
+
+	objectID, ok := result.InsertedID.(bson.ObjectID)
+
+	if !ok {
+		return domain.User{}, errors.New(
+			"failed to get inserted user ID",
+		)
+	}
+
+	user.ID = objectID.Hex()
+
+	// Never return the password to the controller/client.
+	user.Password = ""
+
+	return *user, nil
 }
 
 func (service *UserRepositoryImpl) GetUsers() ([]domain.User, error) {

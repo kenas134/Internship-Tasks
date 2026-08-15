@@ -12,7 +12,7 @@ import (
 )
 
 type TaskRepository interface {
-	Create(task domain.Task) error
+	Create(task *domain.Task) (*domain.Task,error)
 	GetTaskByID(id string) (domain.Task, error)
 	GetTasks() ([]domain.Task, error)
 	Update(task domain.Task) error
@@ -120,7 +120,7 @@ func (service *TaskRepositoryImpl) GetTaskByID(id string) (domain.Task,error) {
 }
 
 
-func (service *TaskRepositoryImpl) Create(task domain.Task)  error {
+func (service *TaskRepositoryImpl) Create(task *domain.Task) (*domain.Task,  error) {
 	newTask := TaskDocument{
 			Title:       task.Title,
 			Description: task.Description,
@@ -134,16 +134,25 @@ func (service *TaskRepositoryImpl) Create(task domain.Task)  error {
 	)
 	defer cancel()
 
-	_, err := service.collection.InsertOne(
+	result, err := service.collection.InsertOne(
 		ctx,
 		newTask,
 	)
 
 	if err != nil {
-		return err
+		return &domain.Task{},err
+	}
+	objectID,ok := result.InsertedID.(bson.ObjectID)
+
+	if !ok {
+		return nil, errors.New(
+			"failed to get inserted user ID",
+		)
 	}
 
-	return nil
+	task.ID = objectID.Hex()
+
+	return task,nil
 }
 
 
@@ -169,7 +178,7 @@ func (service *TaskRepositoryImpl) Update(task domain.Task) error {
 
     ctx, cancel := context.WithTimeout(
         context.Background(),
-        5*time.Second,
+        10*time.Second,
     )
     defer cancel()
 
